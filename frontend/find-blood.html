@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Blood — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section-tight">
+  <div class="container" style="max-width:600px;">
+    <h1>Find blood</h1>
+    <p>Check which donor blood groups are compatible with yours, then create a request against a
+      verified hospital and let BloodLink's matching engine do the rest.</p>
+
+    <div class="card mt-24">
+      <div class="field">
+        <label for="bg-select">Your / patient's blood group</label>
+        <select id="bg-select">
+          <option value="A+">A+</option><option value="A-">A-</option>
+          <option value="B+">B+</option><option value="B-">B-</option>
+          <option value="AB+">AB+</option><option value="AB-">AB-</option>
+          <option value="O+" selected>O+</option><option value="O-">O-</option>
+        </select>
+      </div>
+      <div id="compat-result" class="mt-16"></div>
+      <a href="/recipient/create-request.html" class="btn btn-accent btn-block mt-16">Create a blood request</a>
+      <p class="hint mt-8 mb-0 text-center">You'll need to log in or register first.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+<script>
+// Mirrors the backend's verified compatibility table (app/services/compatibility_service.py)
+// for an instant client-side check. The backend re-validates authoritatively on request.
+const COMPATIBLE_DONORS = {
+  "A+": ["A+","A-","O+","O-"], "A-": ["A-","O-"],
+  "B+": ["B+","B-","O+","O-"], "B-": ["B-","O-"],
+  "AB+": ["A+","A-","B+","B-","AB+","AB-","O+","O-"], "AB-": ["A-","B-","AB-","O-"],
+  "O+": ["O+","O-"], "O-": ["O-"],
+};
+
+const select = document.getElementById("bg-select");
+const result = document.getElementById("compat-result");
+
+function render() {
+  const groups = COMPATIBLE_DONORS[select.value];
+  result.innerHTML = `
+    <div class="alert alert-info mb-0">
+      Compatible donor blood groups for <strong>${select.value}</strong>:
+      ${groups.map(g => `<span class="badge badge-neutral" style="margin-right:4px;">${g}</span>`).join("")}
+    </div>
+  `;
+}
+select.addEventListener("change", render);
+render();
+</script>
+</body>
+</html>

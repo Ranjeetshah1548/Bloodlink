@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notifications — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Notifications</h1>
+    <div id="alert-box"></div>
+    <div id="list" class="card"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/notification.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/notifications.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+</script>
+<script src="/js/notifications-shared.js"></script>
+</body>
+</html>

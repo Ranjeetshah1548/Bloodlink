@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section">
+  <div class="container" style="max-width:760px;">
+    <h1>About BloodLink</h1>
+    <p>BloodLink is a smart blood donation and donor matching platform. It connects people who need
+      blood at a verified hospital with nearby, eligible, available donors — using medically
+      verified compatibility rules first, and a machine learning model second, purely to prioritize
+      outreach among donors who are already eligible.</p>
+
+    <h3 class="mt-32">Why a two-stage approach?</h3>
+    <p>Whether a donor's blood group can safely help a recipient is a fixed medical fact — it is
+      never inferred by a model. BloodLink encodes ABO/Rh compatibility as a fixed rules table.
+      Only after that filter narrows the pool does a trained Random Forest classifier estimate
+      how likely each eligible donor is to respond, using distance, donation history, and
+      availability. That score is a prioritization signal, never a promise.</p>
+
+    <h3 class="mt-32">Data &amp; privacy</h3>
+    <p>All accounts, profiles, requests and responses are stored in a relational MySQL database.
+      Passwords are hashed, sessions use JWTs, and phone numbers go through an OTP-ready
+      verification flow before an account is treated as fully verified.</p>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Admin dashboard</h1>
+    <div id="alert-box"></div>
+    <div class="grid grid-4">
+      <div class="card stat-card"><div class="num" id="stat-users">—</div><div class="label">Total users</div></div>
+      <div class="card stat-card"><div class="num" id="stat-donors">—</div><div class="label">Registered donors</div></div>
+      <div class="card stat-card"><div class="num" id="stat-hospitals">—</div><div class="label">Hospitals (verified)</div></div>
+      <div class="card stat-card"><div class="num" id="stat-reports">—</div><div class="label">Open reports</div></div>
+    </div>
+    <div class="grid grid-2 mt-24">
+      <a href="/admin/hospitals.html" class="card"><h3>Hospital verification</h3><p class="mb-0">Review and verify hospitals so they can receive requests.</p></a>
+      <a href="/admin/reports.html" class="card"><h3>Reports</h3><p class="mb-0">Review user-filed reports on requests.</p></a>
+      <a href="/admin/users.html" class="card"><h3>User management</h3><p class="mb-0">View all registered users.</p></a>
+      <a href="/admin/donors.html" class="card"><h3>Donor management</h3><p class="mb-0">View donor profiles and stats.</p></a>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/admin.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["admin"]);
+renderDashSidebar("/admin/dashboard.html", [
+  ["/admin/dashboard.html", "Dashboard"],
+  ["/admin/users.html", "User Management"],
+  ["/admin/donors.html", "Donor Management"],
+  ["/admin/hospitals.html", "Hospital Verification"],
+  ["/admin/requests.html", "Blood Requests"],
+  ["/admin/reports.html", "Reports"],
+  ["/admin/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+async function load() {
+  try {
+    const [users, donors, hospitals, reports] = await Promise.all([
+      AdminService.listUsers(), AdminService.listDonors(), AdminService.listHospitals(), AdminService.listReports(),
+    ]);
+    document.getElementById("stat-users").textContent = users.length;
+    document.getElementById("stat-donors").textContent = donors.length;
+    document.getElementById("stat-hospitals").textContent = `${hospitals.filter(h => h.is_verified).length}/${hospitals.length}`;
+    document.getElementById("stat-reports").textContent = reports.filter(r => r.status === "open").length;
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+load();
+</script>
+</body>
+</html>

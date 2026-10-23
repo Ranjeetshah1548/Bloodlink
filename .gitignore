@@ -1,0 +1,6 @@
+backend/.env
+backend/venv
+**/__pycache__/
+*.pyc
+backend/test_bloodlink.db
+frontend/tests/node_modules/

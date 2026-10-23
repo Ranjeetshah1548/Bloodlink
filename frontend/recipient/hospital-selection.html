@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Selection — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Select a hospital</h1>
+    <p>Only verified hospitals are listed. Click a marker or a card, then start a request there.</p>
+    <div class="flex gap-8" style="flex-wrap:wrap;">
+      <input id="city-filter" type="text" placeholder="Filter by city…" style="max-width:220px;">
+      <button class="btn btn-outline btn-sm" id="near-btn" type="button">📍 Sort by distance from me</button>
+    </div>
+    <div id="alert-box" class="mt-8"></div>
+    <div id="map" class="mt-16"></div>
+    <div id="grid" class="grid grid-2 mt-16"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/hospital.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/map.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/hospital-selection.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const grid = document.getElementById("grid");
+const cityFilter = document.getElementById("city-filter");
+let me = null, selectedId = null;
+
+function card(h) {
+  return `
+    <div class="card" data-hid="${h.id}" style="cursor:pointer; ${h.id === selectedId ? "border-color:var(--teal);" : ""}">
+      <div class="flex-between">
+        <h3 class="mb-0">${escapeHtml(h.name)}</h3>
+        <span class="badge badge-verified">✓ Verified</span>
+      </div>
+      <p class="mt-8 mb-0">${escapeHtml(h.address)}, ${escapeHtml(h.city)}</p>
+      ${h.distance_km != null ? `<p class="mb-0 muted" style="font-size:0.85rem;">📏 ${h.distance_km} km from you</p>` : ""}
+      <a class="btn btn-accent btn-sm mt-16" href="/recipient/create-request.html?hospital_id=${h.id}">Request from here</a>
+    </div>`;
+}
+
+async function load() {
+  clearAlert(alertBox);
+  try {
+    const hospitals = await HospitalService.list({ city: cityFilter.value, verified_only: true, lat: me && me.lat, lng: me && me.lng });
+    grid.innerHTML = hospitals.length ? hospitals.map(card).join("") : `<div class="empty-state">No verified hospitals found.</div>`;
+    BloodLinkMap.render("map", hospitals, { onSelect: h => { selectedId = h.id; grid.querySelector(`[data-hid="${h.id}"]`)?.scrollIntoView({behavior:"smooth", block:"center"}); } });
+    grid.querySelectorAll("[data-hid]").forEach(c => c.addEventListener("click", e => {
+      if (e.target.tagName === "A") return;
+      selectedId = Number(c.dataset.hid); BloodLinkMap.highlight(selectedId);
+    }));
+  } catch (e) { showAlert(alertBox, e.message); }
+}
+document.getElementById("near-btn").addEventListener("click", async () => {
+  try { me = await BloodLinkMap.userLocation(); load(); } catch (e) { showAlert(alertBox, e.message); }
+});
+cityFilter.addEventListener("input", () => { clearTimeout(window._d); window._d = setTimeout(load, 300); });
+load();
+</script>
+</body>
+</html>

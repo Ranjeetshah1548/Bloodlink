@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verified Hospitals — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section-tight">
+  <div class="container">
+    <div class="flex-between" style="flex-wrap:wrap; gap:16px;">
+      <div>
+        <h1 class="mb-0">Verified hospitals</h1>
+        <p>Only hospitals verified by BloodLink administrators can receive blood requests.</p>
+      </div>
+      <div class="flex gap-8">
+        <input id="city-filter" type="text" placeholder="Filter by city…" style="max-width:200px;">
+        <button class="btn btn-outline btn-sm" id="near-btn" type="button">📍 Near me</button>
+      </div>
+    </div>
+    <div id="alert-box"></div>
+    <div id="map" class="mt-16"></div>
+    <div id="hospital-grid" class="grid grid-3 mt-24"></div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/hospital.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/map.js"></script>
+<script>
+const grid = document.getElementById("hospital-grid");
+const alertBox = document.getElementById("alert-box");
+const cityFilter = document.getElementById("city-filter");
+let me = null; // {lat,lng} once the visitor shares location
+
+function hospitalCard(h) {
+  return `
+    <div class="card" data-hid="${h.id}" style="cursor:pointer;">
+      <div class="flex-between">
+        <h3 class="mb-0">${escapeHtml(h.name)}</h3>
+        <span class="badge badge-verified">✓ Verified</span>
+      </div>
+      <p class="mt-8 mb-0">${escapeHtml(h.address)}, ${escapeHtml(h.city)}</p>
+      <p class="muted mb-0" style="font-size:0.85rem;">📞 ${escapeHtml(h.contact)}
+        ${h.distance_km != null ? `&nbsp;·&nbsp; 📏 <strong>${h.distance_km} km</strong> away` : ""}</p>
+    </div>`;
+}
+
+async function load() {
+  clearAlert(alertBox);
+  try {
+    const hospitals = await HospitalService.list({ city: cityFilter.value, verified_only: true, lat: me && me.lat, lng: me && me.lng });
+    grid.innerHTML = hospitals.length ? hospitals.map(hospitalCard).join("")
+      : `<div class="empty-state">No verified hospitals found${cityFilter.value ? " for that city" : ""}.</div>`;
+    BloodLinkMap.render("map", hospitals);
+    grid.querySelectorAll("[data-hid]").forEach(c => c.addEventListener("click", () => {
+      BloodLinkMap.highlight(Number(c.dataset.hid));
+      document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" });
+    }));
+  } catch (e) { showAlert(alertBox, e.message); grid.innerHTML = ""; }
+}
+
+document.getElementById("near-btn").addEventListener("click", async () => {
+  try { me = await BloodLinkMap.userLocation(); load(); }
+  catch (e) { showAlert(alertBox, e.message); }
+});
+cityFilter.addEventListener("input", () => { clearTimeout(window._d); window._d = setTimeout(load, 300); });
+load();
+</script>
+</body>
+</html>

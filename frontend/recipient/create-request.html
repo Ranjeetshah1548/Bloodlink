@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Blood Request — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Create a blood request</h1>
+    <div id="alert-box"></div>
+
+    <div class="card" style="max-width:560px;">
+      <form id="request-form">
+        <div class="field">
+          <label for="hospital_id">Verified hospital</label>
+          <select id="hospital_id" required><option value="">Loading hospitals…</option></select>
+          <div class="hint">Only verified hospitals can be selected. <a href="/recipient/hospital-selection.html">Browse on the map</a></div>
+          <div id="map" class="mt-8"></div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="blood_group">Blood group needed</label>
+            <select id="blood_group" required>
+              <option value="A+">A+</option><option value="A-">A-</option>
+              <option value="B+">B+</option><option value="B-">B-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option>
+              <option value="O+">O+</option><option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="units_required">Units required</label>
+            <input id="units_required" type="number" min="1" max="20" value="1" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="urgency">Urgency</label>
+          <select id="urgency" required>
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <h3 style="font-size:1.05rem; margin-top:8px;">Patient &amp; contact details</h3>
+        <p class="hint" style="margin-top:-4px;">Donors <strong>do not see</strong> these until they accept your request.
+          Once a donor accepts, they get this contact so they can reach you and find the patient.</p>
+        <div class="form-row">
+          <div class="field">
+            <label for="patient_name">Patient name</label>
+            <input id="patient_name" required minlength="2" maxlength="120" placeholder="Patient's full name">
+          </div>
+          <div class="field">
+            <label for="ward_info">Ward / bed (optional)</label>
+            <input id="ward_info" maxlength="150" placeholder="e.g. ICU, Bed 4">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="contact_name">Contact person</label>
+            <input id="contact_name" required minlength="2" maxlength="120" placeholder="Who should the donor call?">
+          </div>
+          <div class="field">
+            <label for="contact_phone">Contact phone</label>
+            <input id="contact_phone" required type="tel" pattern="^\+?[0-9][0-9\s\-]{6,18}$" placeholder="+91 98xxxxxxxx">
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" rows="3" placeholder="Any additional context for the hospital/donors"></textarea>
+        </div>
+        <button class="btn btn-accent btn-block" type="submit" id="submit-btn">Create request &amp; find donors</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/hospital.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/matching.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/map.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/create-request.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const form = document.getElementById("request-form");
+const submitBtn = document.getElementById("submit-btn");
+const hospitalSelect = document.getElementById("hospital_id");
+const preselectedHospitalId = new URLSearchParams(window.location.search).get("hospital_id");
+
+let allHospitals = [];
+function showSelectedOnMap() {
+  const h = allHospitals.find(x => x.id === Number(hospitalSelect.value));
+  if (h) BloodLinkMap.render("map", [h], { height: 220 });
+}
+hospitalSelect.addEventListener("change", showSelectedOnMap);
+
+async function loadHospitals() {
+  try {
+    const hospitals = await HospitalService.list({ verified_only: true });
+    hospitalSelect.innerHTML = hospitals.length
+      ? hospitals.map(h => `<option value="${h.id}">${escapeHtml(h.name)} — ${escapeHtml(h.city)}</option>`).join("")
+      : `<option value="">No verified hospitals available</option>`;
+    if (preselectedHospitalId) hospitalSelect.value = preselectedHospitalId;
+    allHospitals = hospitals;
+    showSelectedOnMap();
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+loadHospitals();
+
+// Pre-fill contact with the logged-in user's own details (editable).
+AuthService.me().then(u => {
+  const n = document.getElementById("contact_name"), p = document.getElementById("contact_phone");
+  if (!n.value) n.value = u.full_name;
+  if (!p.value) p.value = u.phone;
+}).catch(() => {});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Creating request…";
+  try {
+    const req = await BloodRequestService.create({
+      hospital_id: Number(hospitalSelect.value),
+      blood_group: document.getElementById("blood_group").value,
+      units_required: Number(document.getElementById("units_required").value),
+      urgency: document.getElementById("urgency").value,
+      notes: document.getElementById("notes").value.trim() || null,
+      patient_name: document.getElementById("patient_name").value.trim(),
+      contact_name: document.getElementById("contact_name").value.trim(),
+      contact_phone: document.getElementById("contact_phone").value.trim(),
+      ward_info: document.getElementById("ward_info").value.trim() || null,
+    });
+    window.location.href = `/recipient/matching-results.html?id=${req.id}`;
+  } catch (err) {
+    showAlert(alertBox, err.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Create request & find donors";
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report a Problem — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Report a problem</h1>
+    <p>Tell administrators about a suspicious request, a donor who didn't show up, or a hospital issue.</p>
+    <div id="alert-box"></div>
+    <div class="card" style="max-width:560px;">
+      <form id="report-form">
+        <div class="field">
+          <label for="request_id">Related request</label>
+          <select id="request_id"><option value="">None / general</option></select>
+        </div>
+        <div class="field">
+          <label for="reason">Reason</label>
+          <select id="reason" required>
+            <option>Donor did not show up</option><option>Suspicious or fake request</option>
+            <option>Hospital information incorrect</option><option>Inappropriate behaviour</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label for="description">Details</label><textarea id="description" rows="4"></textarea></div>
+        <button class="btn btn-accent btn-block" type="submit">Submit report</button>
+      </form>
+    </div>
+    <h3 class="mt-32">Your previous reports</h3>
+    <div id="mine"></div>
+  </main>
+</div>
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/notification.js"></script>
+<script src="/js/app.js"></script>
+<script>
+AuthService.requireRole(["recipient", "donor"]);
+const role = AuthService.currentSession().role;
+const base = "/" + role;
+renderDashSidebar(base + "/report.html", role === "recipient" ? [
+  ["/recipient/dashboard.html", "Dashboard"], ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"], ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"]] : [
+  ["/donor/dashboard.html", "Dashboard"], ["/donor/requests.html", "Incoming Requests"],
+  ["/donor/report.html", "Report a Problem"], ["/donor/notifications.html", "Notifications"]]);
+const alertBox = document.getElementById("alert-box");
+const sel = document.getElementById("request_id");
+
+async function load() {
+  try {
+    const reqs = await BloodRequestService.list();
+    reqs.forEach(r => sel.insertAdjacentHTML("beforeend", `<option value="${r.id}">Request #${r.id} — ${r.blood_group}</option>`));
+    const pre = new URLSearchParams(location.search).get("request_id");
+    if (pre) sel.value = pre;
+    const mine = await ReportService.mine();
+    document.getElementById("mine").innerHTML = mine.length ? mine.map(r => `
+      <div class="card mt-8"><strong>${escapeHtml(r.reason)}</strong> ${r.request_id ? "— Request #" + r.request_id : ""}
+      <span class="badge badge-info" style="float:right;">${r.status}</span>
+      <div class="muted" style="font-size:0.85rem;">${fmtDateTime(r.created_at)}</div></div>`).join("")
+      : `<div class="empty-state">No reports filed.</div>`;
+  } catch (e) { showAlert(alertBox, e.message); }
+}
+document.getElementById("report-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  try {
+    await ReportService.create({
+      request_id: sel.value ? Number(sel.value) : null,
+      reason: document.getElementById("reason").value,
+      description: document.getElementById("description").value.trim() || null,
+    });
+    e.target.reset();
+    await load();
+    showAlert(alertBox, "Report submitted. An administrator will review it.", "success");
+  } catch (err) { showAlert(alertBox, err.message); }
+});
+load();
+</script>
+</body>
+</html>

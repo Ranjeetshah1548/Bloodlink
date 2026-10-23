@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Request — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Track request</h1>
+    <div id="alert-box"></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/notification.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/dashboard.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+
+const requestId = new URLSearchParams(window.location.search).get("id");
+const alertBox = document.getElementById("alert-box");
+const content = document.getElementById("content");
+
+const STEPS = [
+  ["created", "Created"], ["hospital_selected", "Hospital Selected"],
+  ["compatibility_checked", "Compatibility Checked"], ["donors_found", "Eligible Donors Found"],
+  ["donors_ranked", "Donors Ranked"], ["request_sent", "Request Sent"],
+  ["donor_accepted", "Donor Accepted"], ["fulfilled", "Fulfilled"],
+];
+
+function trackerHtml(status) {
+  const terminal = ["closed", "expired"];
+  const idx = STEPS.findIndex(([s]) => s === status);
+  return `
+    <div class="tracker">
+      ${STEPS.map(([s, label], i) => {
+        let cls = "";
+        if (terminal.includes(status)) cls = i === 0 ? "done" : "";
+        else if (i < idx) cls = "done";
+        else if (i === idx) cls = "current";
+        return `<div class="tracker-step ${cls}">${label}</div>`;
+      }).join("")}
+    </div>
+    ${terminal.includes(status) ? `<div class="alert alert-info">This request is <strong>${status}</strong>${status === "expired" ? " — no donor responded in time. Please create a new request." : ""}.</div>` : ""}
+  `;
+}
+
+async function load() {
+  clearAlert(alertBox);
+  content.innerHTML = `<div class="skeleton" style="height:200px;"></div>`;
+  try {
+    const [req, responders] = await Promise.all([BloodRequestService.get(requestId), BloodRequestService.responders(requestId)]);
+    content.innerHTML = `
+      <div class="card">
+        <div class="flex-between" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <strong>Request #${req.id}</strong> — ${req.blood_group}, ${req.units_required} unit(s)
+            <div class="muted" style="font-size:0.85rem;">
+              <span class="badge ${urgencyBadgeClass(req.urgency)}">${req.urgency}</span>
+              &nbsp;·&nbsp; created ${fmtDateTime(req.created_at)}
+              ${req.fulfilled_at ? `&nbsp;·&nbsp; fulfilled ${fmtDateTime(req.fulfilled_at)}` : ""}
+            </div>
+          </div>
+          <div class="flex gap-8">
+            ${req.status === "donor_accepted" ? `<button class="btn btn-accent btn-sm" id="fulfill-btn">Mark fulfilled</button>` : ""}
+            ${!["closed", "expired", "fulfilled"].includes(req.status) ? `<button class="btn btn-ghost btn-sm" id="close-btn">Close request</button>` : ""}
+            ${["closed","expired","fulfilled"].includes(req.status) ? "" : `<a class="btn btn-outline btn-sm" href="/recipient/matching-results.html?id=${req.id}">View matches</a>`}
+            <a class="btn btn-ghost btn-sm" href="/recipient/report.html?request_id=${req.id}">Report a problem</a>
+          </div>
+        </div>
+        ${trackerHtml(req.status)}
+        ${req.notes ? `<p class="muted mt-16 mb-0"><strong>Notes:</strong> ${escapeHtml(req.notes)}</p>` : ""}
+        <p class="muted mt-16 mb-0" style="font-size:0.88rem;">
+          🧑‍⚕️ Patient: <strong>${escapeHtml(req.patient_name || "—")}</strong>${req.ward_info ? " · " + escapeHtml(req.ward_info) : ""}
+          &nbsp;·&nbsp; 📞 Contact: ${escapeHtml(req.contact_name || "—")} (${escapeHtml(req.contact_phone || "—")})
+          <br>Shared with a donor only after that donor accepts.</p>
+      </div>
+      <div class="card mt-16">
+        <h3>Donors contacted</h3>
+        ${responders.length ? responders.map(d => `
+          <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px;">
+            <div><strong>${escapeHtml(d.donor_name)}</strong> — ${d.blood_group}
+              ${d.distance_km != null ? `<span class="muted">· ${d.distance_km} km</span>` : ""}</div>
+            <div>
+              ${d.response === "accepted"
+                ? `<span class="badge badge-verified">accepted</span> &nbsp; <a class="btn btn-accent btn-sm" href="tel:${escapeHtml(d.phone)}">📞 ${escapeHtml(d.phone)}</a>`
+                : `<span class="badge ${d.response === "declined" ? "badge-neutral" : "badge-pending"}">${d.response === "pending" ? "awaiting reply" : "declined"}</span>`}
+            </div>
+          </div>`).join("") : `<div class="empty-state" style="padding:16px;">No donors contacted yet. <a href="/recipient/matching-results.html?id=${req.id}">Choose donors</a></div>`}
+        <p class="hint mt-8 mb-0">A donor's phone number appears here only after they accept.</p>
+      </div>
+    `;
+
+    const fulfillBtn = document.getElementById("fulfill-btn");
+    if (fulfillBtn) fulfillBtn.addEventListener("click", async () => {
+      try { await BloodRequestService.update(req.id, { status: "fulfilled" }); load(); }
+      catch (e) { showAlert(alertBox, e.message); }
+    });
+    const closeBtn = document.getElementById("close-btn");
+    if (closeBtn) closeBtn.addEventListener("click", async () => {
+      if (!confirm("Close this request? This cannot be undone.")) return;
+      try { await BloodRequestService.update(req.id, { status: "closed" }); load(); }
+      catch (e) { showAlert(alertBox, e.message); }
+    });
+  } catch (e) {
+    showAlert(alertBox, e.message);
+    content.innerHTML = "";
+  }
+}
+if (!requestId) showAlert(alertBox, "No request specified.");
+else { load(); setInterval(() => { if (!document.hidden && !document.activeElement.matches("select,input")) load(); }, 10000); }
+</script>
+</body>
+</html>

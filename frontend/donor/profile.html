@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donor Profile — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Donor profile</h1>
+    <p id="mode-hint" class="muted">Loading…</p>
+    <div id="alert-box"></div>
+
+    <div class="card" style="max-width:560px;">
+      <form id="profile-form">
+        <div class="form-row">
+          <div class="field">
+            <label for="blood_group">Blood group</label>
+            <select id="blood_group" required>
+              <option value="A+">A+</option><option value="A-">A-</option>
+              <option value="B+">B+</option><option value="B-">B-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option>
+              <option value="O+">O+</option><option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="age">Age</label>
+            <input id="age" type="number" min="18" max="65" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="city">City</label>
+          <input id="city" required placeholder="Amritsar">
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="latitude">Latitude</label>
+            <input id="latitude" type="number" step="any" required>
+          </div>
+          <div class="field">
+            <label for="longitude">Longitude</label>
+            <input id="longitude" type="number" step="any" required>
+          </div>
+        </div>
+        <button type="button" id="geo-btn" class="btn btn-ghost btn-sm">📍 Use my current location</button>
+        <div class="field mt-16">
+          <label for="last_donation_date">Last donation date (optional)</label>
+          <input id="last_donation_date" type="date">
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:500; font-size:0.9rem;">
+          <input id="is_available" type="checkbox" style="width:auto;" checked> Available to donate right now
+        </label>
+        <button class="btn btn-accent btn-block mt-24" type="submit" id="submit-btn">Save profile</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/donor.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["donor"]);
+renderDashSidebar("/donor/profile.html", [
+  ["/donor/dashboard.html", "Dashboard"],
+  ["/donor/profile.html", "Profile"],
+  ["/donor/availability.html", "Availability"],
+  ["/donor/requests.html", "Incoming Requests"],
+  ["/donor/history.html", "Donation History"],
+  ["/donor/report.html", "Report a Problem"],
+  ["/donor/notifications.html", "Notifications"],
+]);
+
+const form = document.getElementById("profile-form");
+const alertBox = document.getElementById("alert-box");
+const submitBtn = document.getElementById("submit-btn");
+const modeHint = document.getElementById("mode-hint");
+let isEdit = false;
+
+document.getElementById("geo-btn").addEventListener("click", () => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition((pos) => {
+    document.getElementById("latitude").value = pos.coords.latitude.toFixed(6);
+    document.getElementById("longitude").value = pos.coords.longitude.toFixed(6);
+  }, () => showAlert(alertBox, "Could not access your location. Enter latitude/longitude manually."));
+});
+
+async function load() {
+  try {
+    const donor = await DonorService.getMe();
+    isEdit = true;
+    modeHint.textContent = "Update your existing donor profile.";
+    document.getElementById("blood_group").value = donor.blood_group;
+    document.getElementById("age").value = donor.age;
+    document.getElementById("city").value = donor.city;
+    document.getElementById("latitude").value = donor.latitude;
+    document.getElementById("longitude").value = donor.longitude;
+    document.getElementById("last_donation_date").value = donor.last_donation_date || "";
+    document.getElementById("is_available").checked = donor.is_available;
+  } catch (e) {
+    if (e.status === 404) {
+      modeHint.textContent = "Create your donor profile to start receiving matched requests.";
+    } else {
+      showAlert(alertBox, e.message);
+    }
+  }
+}
+load();
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving…";
+  const payload = {
+    blood_group: document.getElementById("blood_group").value,
+    age: Number(document.getElementById("age").value),
+    city: document.getElementById("city").value.trim(),
+    latitude: Number(document.getElementById("latitude").value),
+    longitude: Number(document.getElementById("longitude").value),
+    last_donation_date: document.getElementById("last_donation_date").value || null,
+    is_available: document.getElementById("is_available").checked,
+  };
+  try {
+    if (isEdit) await DonorService.updateMe(payload);
+    else await DonorService.create(payload);
+    showAlert(alertBox, "Profile saved.", "success");
+    setTimeout(() => window.location.href = "/donor/dashboard.html", 800);
+  } catch (err) {
+    showAlert(alertBox, err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Save profile";
+  }
+});
+</script>
+</body>
+</html>

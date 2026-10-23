@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How It Works — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section">
+  <div class="container" style="max-width:820px;">
+    <h1>How matching works</h1>
+    <p>Every request moves through the same pipeline, and the status is visible to the recipient
+      the whole way through.</p>
+
+    <div class="card mt-32">
+      <div class="flex mt-16"><span class="step-marker">1</span><div><strong>Request created</strong><p class="mb-0">A recipient specifies a blood group, units required, and urgency.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">2</span><div><strong>Hospital selected</strong><p class="mb-0">Only verified hospitals — picked from the map/list, never typed freely.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">3</span><div><strong>Compatibility checked</strong><p class="mb-0">Fixed ABO/Rh rules determine which donor blood groups are eligible.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">4</span><div><strong>Eligible donors found</strong><p class="mb-0">Filtered further by availability and minimum donation interval (90 days).</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">5</span><div><strong>Donors ranked</strong><p class="mb-0">Distance is computed from lat/long, and a Random Forest model scores response likelihood.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">6</span><div><strong>Request sent</strong><p class="mb-0">The top-ranked donors are notified.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">7</span><div><strong>Donor responds</strong><p class="mb-0">Each notified donor can accept or decline.</p></div></div>
+      <div class="flex mt-16"><span class="step-marker">8</span><div><strong>Request fulfilled</strong><p class="mb-0">Once resolved, the donation is recorded in the donor's history.</p></div></div>
+    </div>
+
+    <div class="alert alert-info mt-32">
+      The ML response-likelihood score is a prioritization signal only — never a guarantee that a
+      donor will respond, and never a factor in medical eligibility.
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

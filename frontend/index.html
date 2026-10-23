@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BloodLink — Smart Blood Donation &amp; Donor Matching</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="hero">
+  <div class="container grid grid-2" style="align-items:center;">
+    <div>
+      <h1>Find the right donor, in minutes — not hours.</h1>
+      <p class="lede">BloodLink matches verified hospitals, real donor availability and a Random
+        Forest model trained on response patterns to rank the donors most likely to help,
+        the moment a request is created.</p>
+      <div class="flex gap-12 mt-24">
+        <a href="/register.html" class="btn btn-accent">Register as a donor</a>
+        <a href="/find-blood.html" class="btn btn-outline" style="border-color:#fff;color:#fff;">Request blood now</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="num">8</div><div class="label">Compatibility rules, medically verified</div></div>
+        <div class="hero-stat"><div class="num">ML</div><div class="label">Random Forest response-likelihood ranking</div></div>
+        <div class="hero-stat"><div class="num">Live</div><div class="label">Request tracking, end to end</div></div>
+      </div>
+    </div>
+    <div class="card" style="background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.18); color:#fff;">
+      <h3 style="color:#fff;">How matching works</h3>
+      <ol style="color:#C9D8E3; padding-left:20px; line-height:2;">
+        <li>Compatibility rules find eligible donor blood groups</li>
+        <li>Availability &amp; donation-interval filters narrow the pool</li>
+        <li>Distance to hospital is calculated (lat/long)</li>
+        <li>A trained Random Forest scores response likelihood</li>
+        <li>Donors are ranked and notified in order</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Built for the real workflow</h2>
+    <div class="grid grid-3 mt-24">
+      <div class="card">
+        <h3>Verified hospitals only</h3>
+        <p>Every blood request is tied to a hospital that has been verified by an administrator —
+          no free-text hospital entry.</p>
+      </div>
+      <div class="card">
+        <h3>Transparent prioritization</h3>
+        <p>The response-likelihood score is a prioritization signal, never a guarantee. Medical
+          eligibility always comes first, from fixed compatibility rules.</p>
+      </div>
+      <div class="card">
+        <h3>Full request tracking</h3>
+        <p>Recipients can watch a request move from created through hospital selection, matching,
+          donor response, and fulfillment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

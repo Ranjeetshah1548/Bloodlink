@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section-tight">
+  <div class="container" style="max-width:480px;">
+    <h1>Create your account</h1>
+    <p>Register as a donor to be matched with nearby requests, or as a recipient to request blood
+      from verified hospitals.</p>
+
+    <div class="card mt-24">
+      <div id="alert-box"></div>
+      <form id="register-form">
+        <div class="field">
+          <label for="full_name">Full name</label>
+          <input id="full_name" name="full_name" required minlength="2" placeholder="Jordan Rivera">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="phone">Phone (with country code)</label>
+          <input id="phone" name="phone" required placeholder="+911234567890">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required minlength="8" placeholder="At least 8 characters">
+        </div>
+        <div class="field">
+          <label for="role">I am a…</label>
+          <select id="role" name="role" required>
+            <option value="recipient">Blood seeker / recipient</option>
+            <option value="donor">Donor</option>
+          </select>
+        </div>
+        <button class="btn btn-accent btn-block" type="submit" id="submit-btn">Create account</button>
+      </form>
+      <p class="mt-16 text-center mb-0">Already have an account? <a href="/login.html">Log in</a></p>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const form = document.getElementById("register-form");
+const alertBox = document.getElementById("alert-box");
+const submitBtn = document.getElementById("submit-btn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Creating account…";
+  try {
+    const data = await AuthService.register({
+      full_name: form.elements.full_name.value.trim(),
+      email: form.elements.email.value.trim(),
+      phone: form.elements.phone.value.trim(),
+      password: form.elements.password.value,
+      role: form.elements.role.value,
+    });
+    window.location.href = `/verify-otp.html?phone=${encodeURIComponent(form.elements.phone.value.trim())}&role=${data.role}`;
+  } catch (err) {
+    showAlert(alertBox, err.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Create account";
+  }
+});
+</script>
+</body>
+</html>

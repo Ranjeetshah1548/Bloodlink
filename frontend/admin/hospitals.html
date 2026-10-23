@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Verification — BloodLink Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <div class="flex-between">
+      <h1 class="mb-0">Hospital verification</h1>
+      <button class="btn btn-accent btn-sm" id="add-btn">+ Add hospital</button>
+    </div>
+    <div id="alert-box"></div>
+
+    <div id="add-form-wrap" class="card mt-16" style="display:none;">
+      <h3>Add a new hospital</h3>
+      <form id="add-form">
+        <div class="form-row">
+          <div class="field"><label>Name</label><input id="h-name" required></div>
+          <div class="field"><label>Contact</label><input id="h-contact" required placeholder="+91..."></div>
+        </div>
+        <div class="field"><label>Address</label><input id="h-address" required></div>
+        <div class="form-row">
+          <div class="field"><label>City</label><input id="h-city" required></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Latitude</label><input id="h-lat" type="number" step="any" required></div>
+          <div class="field"><label>Longitude</label><input id="h-lng" type="number" step="any" required></div>
+        </div>
+        <button class="btn btn-primary" type="submit">Add (unverified)</button>
+      </form>
+    </div>
+
+    <div id="grid" class="grid grid-2 mt-16"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/admin.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["admin"]);
+renderDashSidebar("/admin/hospitals.html", [
+  ["/admin/dashboard.html", "Dashboard"],
+  ["/admin/users.html", "User Management"],
+  ["/admin/donors.html", "Donor Management"],
+  ["/admin/hospitals.html", "Hospital Verification"],
+  ["/admin/requests.html", "Blood Requests"],
+  ["/admin/reports.html", "Reports"],
+  ["/admin/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const grid = document.getElementById("grid");
+const addBtn = document.getElementById("add-btn");
+const addFormWrap = document.getElementById("add-form-wrap");
+const addForm = document.getElementById("add-form");
+
+addBtn.addEventListener("click", () => {
+  addFormWrap.style.display = addFormWrap.style.display === "none" ? "block" : "none";
+});
+
+async function load() {
+  clearAlert(alertBox);
+  try {
+    const hospitals = await AdminService.listHospitals();
+    grid.innerHTML = hospitals.map(h => `
+      <div class="card">
+        <div class="flex-between">
+          <h3 class="mb-0">${escapeHtml(h.name)}</h3>
+          ${h.is_verified ? `<span class="badge badge-verified">✓ Verified</span>` : `<span class="badge badge-pending">Pending</span>`}
+        </div>
+        <p class="mt-8 mb-0">${escapeHtml(h.address)}, ${escapeHtml(h.city)}</p>
+        <p class="muted mb-0" style="font-size:0.85rem;">📞 ${escapeHtml(h.contact)}</p>
+        ${!h.is_verified ? `<button class="btn btn-accent btn-sm mt-16" data-id="${h.id}">Verify hospital</button>` : ""}
+      </div>
+    `).join("") || `<div class="empty-state">No hospitals yet.</div>`;
+
+    grid.querySelectorAll("button[data-id]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try { await AdminService.verifyHospital(btn.dataset.id); load(); }
+        catch (e) { showAlert(alertBox, e.message); btn.disabled = false; }
+      });
+    });
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+
+addForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  try {
+    await AdminService.createHospital({
+      name: document.getElementById("h-name").value.trim(),
+      address: document.getElementById("h-address").value.trim(),
+      city: document.getElementById("h-city").value.trim(),
+      latitude: Number(document.getElementById("h-lat").value),
+      longitude: Number(document.getElementById("h-lng").value),
+      contact: document.getElementById("h-contact").value.trim(),
+    });
+    addForm.reset();
+    addFormWrap.style.display = "none";
+    load();
+  } catch (err) {
+    showAlert(alertBox, err.message);
+  }
+});
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matching Results — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <div class="flex-between" style="flex-wrap:wrap; gap:8px;">
+      <h1 class="mb-0">Matching results</h1>
+      <div class="flex gap-8">
+        <button class="btn btn-outline btn-sm" id="rerun-btn">Refresh ranking</button>
+        <a class="btn btn-ghost btn-sm" id="track-link" href="#">Track this request →</a>
+      </div>
+    </div>
+    <div id="alert-box"></div>
+    <div id="summary" class="card mt-16"></div>
+    <div id="send-bar" class="flex-between mt-16" style="display:none; gap:12px; flex-wrap:wrap;">
+      <div class="muted" id="selected-count">0 selected</div>
+      <div class="flex gap-8">
+        <button class="btn btn-ghost btn-sm" id="top3-btn" type="button">Select top 3</button>
+        <button class="btn btn-accent" id="send-btn" type="button" disabled>Send request to selected donors</button>
+      </div>
+    </div>
+    <div id="donor-list" class="mt-8"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/matching.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/create-request.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+
+const requestId = new URLSearchParams(window.location.search).get("id");
+document.getElementById("track-link").href = `/recipient/track-request.html?id=${requestId}`;
+
+const alertBox = document.getElementById("alert-box");
+const summaryEl = document.getElementById("summary");
+const listEl = document.getElementById("donor-list");
+const sendBar = document.getElementById("send-bar");
+const sendBtn = document.getElementById("send-btn");
+const countEl = document.getElementById("selected-count");
+let ranked = [];
+
+function selectedIds() {
+  return [...listEl.querySelectorAll("input[type=checkbox]:checked")].map(c => Number(c.value));
+}
+function updateBar() {
+  const n = selectedIds().length;
+  countEl.textContent = `${n} selected`;
+  sendBtn.disabled = n === 0;
+}
+
+function pill(status) {
+  if (!status) return "";
+  const cls = { pending: "badge-pending", accepted: "badge-verified", declined: "badge-neutral" }[status];
+  return `<span class="badge ${cls}">${status === "pending" ? "request sent — awaiting reply" : status}</span>`;
+}
+
+async function runAndRender() {
+  clearAlert(alertBox);
+  listEl.innerHTML = `<div class="skeleton" style="height:60px;"></div>`;
+  try {
+    const result = await MatchingService.runMatch(requestId);
+    ranked = result.ranked_donors;
+    summaryEl.innerHTML = `
+      <div class="flex-between" style="flex-wrap:wrap; gap:8px;">
+        <div>Compatible donor blood groups: ${result.eligible_blood_groups.map(g => `<span class="badge badge-neutral">${g}</span>`).join(" ")}</div>
+        <div><strong>${result.total_eligible_donors}</strong> eligible donor(s), ranked</div>
+      </div>
+      <p class="mt-16 mb-0" style="font-size:0.85rem;">
+        <strong>Response likelihood</strong> is a Random Forest prioritization signal — it estimates how
+        likely a donor is to reply. It is <em>not</em> a guarantee and plays no part in medical
+        eligibility, which comes from fixed compatibility rules.
+      </p>`;
+
+    sendBar.style.display = ranked.length ? "flex" : "none";
+    listEl.innerHTML = ranked.length ? "" : `<div class="empty-state">No eligible donors available right now. Refresh later as donors become available.</div>`;
+    ranked.forEach((d, i) => {
+      const contacted = !!d.request_status;
+      const pct = Math.round(d.response_likelihood * 100);
+      const card = document.createElement("label");
+      card.className = "card mt-16";
+      card.style.cssText = "display:block; cursor:" + (contacted ? "default" : "pointer");
+      card.innerHTML = `
+        <div class="flex-between" style="flex-wrap:wrap; gap:12px;">
+          <div class="flex gap-12">
+            <input type="checkbox" value="${d.donor_id}" style="width:auto;" ${contacted ? "disabled" : ""}>
+            <div>
+              <strong>#${i + 1} ${escapeHtml(d.donor_name)}</strong> — ${d.blood_group}, ${escapeHtml(d.city)} ${pill(d.request_status)}
+              <div class="muted" style="font-size:0.85rem;">
+                ${d.distance_km} km from hospital
+                &nbsp;·&nbsp; ${d.days_since_last_donation != null ? d.days_since_last_donation + " days since last donation" : "no prior donation on record"}
+                &nbsp;·&nbsp; past response rate ${Math.round(d.historical_response_rate * 100)}%
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-display); font-size:1.4rem; color:var(--teal); font-weight:700;">${pct}%</div>
+            <div class="muted" style="font-size:0.75rem;">response likelihood</div>
+          </div>
+        </div>`;
+      listEl.appendChild(card);
+    });
+    listEl.querySelectorAll("input[type=checkbox]").forEach(c => c.addEventListener("change", updateBar));
+    updateBar();
+  } catch (e) {
+    showAlert(alertBox, e.status === 410 ? "This request has expired. Create a new request." : e.message);
+    listEl.innerHTML = "";
+  }
+}
+
+document.getElementById("top3-btn").addEventListener("click", () => {
+  listEl.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = false);
+  [...listEl.querySelectorAll("input[type=checkbox]:not(:disabled)")].slice(0, 3).forEach(c => c.checked = true);
+  updateBar();
+});
+
+sendBtn.addEventListener("click", async () => {
+  clearAlert(alertBox);
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending…";
+  try {
+    const r = await MatchingService.sendRequests(requestId, selectedIds());
+    await runAndRender();
+    showAlert(alertBox, `Request sent to ${r.sent_to.length} donor(s). They have been notified.`, "success");
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  } finally {
+    sendBtn.textContent = "Send request to selected donors";
+    updateBar();
+  }
+});
+document.getElementById("rerun-btn").addEventListener("click", runAndRender);
+if (!requestId) showAlert(alertBox, "No request specified."); else runAndRender();
+</script>
+</body>
+</html>

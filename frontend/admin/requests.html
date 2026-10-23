@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blood Requests — BloodLink Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>All blood requests</h1>
+    <div id="alert-box"></div>
+    <div class="card">
+      <table>
+        <thead><tr><th>ID</th><th>Requester</th><th>Hospital</th><th>Blood group</th><th>Units</th><th>Urgency</th><th>Status</th><th>Patient</th><th>Contact</th><th>Created</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="10" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/hospital.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["admin"]);
+renderDashSidebar("/admin/requests.html", [
+  ["/admin/dashboard.html", "Dashboard"],
+  ["/admin/users.html", "User Management"],
+  ["/admin/donors.html", "Donor Management"],
+  ["/admin/hospitals.html", "Hospital Verification"],
+  ["/admin/requests.html", "Blood Requests"],
+  ["/admin/reports.html", "Reports"],
+  ["/admin/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const rows = document.getElementById("rows");
+
+async function load() {
+  try {
+    const requests = await BloodRequestService.list();
+    rows.innerHTML = requests.map(r => `
+      <tr>
+        <td>#${r.id}</td><td>User ${r.requester_id}</td><td>Hospital ${r.hospital_id}</td>
+        <td>${r.blood_group}</td><td>${r.units_required}</td>
+        <td><span class="badge ${urgencyBadgeClass(r.urgency)}">${r.urgency}</span></td>
+        <td><span class="badge badge-info">${r.status}</span></td>
+        <td>${escapeHtml(r.patient_name || '—')}</td><td>${escapeHtml(r.contact_name || '—')}<br><span class="muted">${escapeHtml(r.contact_phone || '')}</span></td>
+        <td>${fmtDateTime(r.created_at)}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="10" class="muted">No requests yet.</td></tr>`;
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<section class="section-tight">
+  <div class="container" style="max-width:420px;">
+    <h1>Welcome back</h1>
+    <div class="card mt-24">
+      <div id="alert-box"></div>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required placeholder="Your password">
+        </div>
+        <button class="btn btn-accent btn-block" type="submit" id="submit-btn">Log in</button>
+      </form>
+      <p class="mt-16 text-center mb-0">New to BloodLink? <a href="/register.html">Register</a></p>
+    </div>
+
+    <div class="card mt-16" style="background:#FAFCFD;">
+      <p class="mb-0" style="font-size:0.82rem;"><strong>Try the seeded demo accounts</strong> (after
+        running <code>python seed.py</code>): <br>
+        admin@bloodlink.dev / Admin@1234 &nbsp;·&nbsp;
+        donor1@bloodlink.dev / Donor@1234 &nbsp;·&nbsp;
+        recipient1@bloodlink.dev / Recipient@1234</p>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"><div id="site-footer"></div></footer>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const form = document.getElementById("login-form");
+const alertBox = document.getElementById("alert-box");
+const submitBtn = document.getElementById("submit-btn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  clearAlert(alertBox);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Logging in…";
+  try {
+    const data = await AuthService.login({ email: form.elements.email.value.trim(), password: form.elements.password.value });
+    const dashByRole = { donor: "/donor/dashboard.html", recipient: "/recipient/dashboard.html", admin: "/admin/dashboard.html" };
+    window.location.href = dashByRole[data.role] || "/index.html";
+  } catch (err) {
+    showAlert(alertBox, err.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Log in";
+  }
+});
+</script>
+</body>
+</html>

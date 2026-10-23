@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recipient Dashboard — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <div class="flex-between">
+      <h1 class="mb-0">Your blood requests</h1>
+      <a href="/recipient/create-request.html" class="btn btn-accent">+ New request</a>
+    </div>
+    <div id="alert-box"></div>
+    <div id="list" class="mt-16"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["recipient"]);
+renderDashSidebar("/recipient/dashboard.html", [
+  ["/recipient/dashboard.html", "Dashboard"],
+  ["/recipient/create-request.html", "Create Blood Request"],
+  ["/recipient/hospital-selection.html", "Hospital Selection"],
+  ["/recipient/report.html", "Report a Problem"],
+  ["/recipient/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const listEl = document.getElementById("list");
+
+const statusLabels = {
+  created: "Created", hospital_selected: "Hospital selected", compatibility_checked: "Checking compatibility",
+  donors_found: "Donors found", donors_ranked: "Donors ranked", request_sent: "Sent to donors",
+  donor_accepted: "Donor accepted", fulfilled: "Fulfilled", closed: "Closed", expired: "Expired",
+};
+const statusBadge = {
+  fulfilled: "badge-verified", closed: "badge-neutral", expired: "badge-neutral",
+  donor_accepted: "badge-verified",
+};
+
+async function load() {
+  clearAlert(alertBox);
+  listEl.innerHTML = `<div class="skeleton" style="height:80px;"></div>`;
+  try {
+    const requests = await BloodRequestService.list();
+    listEl.innerHTML = requests.length ? "" : `<div class="empty-state">You haven't created any requests yet.</div>`;
+    requests.forEach(r => {
+      const card = document.createElement("div");
+      card.className = "card mt-16";
+      card.innerHTML = `
+        <div class="flex-between" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <strong>Request #${r.id} — ${r.blood_group}, ${r.units_required} unit(s)</strong>
+            <div class="muted" style="font-size:0.85rem;">
+              <span class="badge ${urgencyBadgeClass(r.urgency)}">${r.urgency}</span>
+              &nbsp;·&nbsp; <span class="badge ${statusBadge[r.status] || 'badge-info'}">${statusLabels[r.status] || r.status}</span>
+              &nbsp;·&nbsp; created ${fmtDateTime(r.created_at)}
+            </div>
+          </div>
+          <a href="/recipient/track-request.html?id=${r.id}" class="btn btn-outline btn-sm">Track</a>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+  } catch (e) {
+    showAlert(alertBox, e.message);
+    listEl.innerHTML = "";
+  }
+}
+load();
+</script>
+</body>
+</html>

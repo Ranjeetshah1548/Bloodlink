@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Management — BloodLink Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>User management</h1>
+    <div id="alert-box"></div>
+    <div class="card">
+      <table>
+        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Phone verified</th><th>Active</th><th>Joined</th><th></th></tr></thead>
+        <tbody id="rows"><tr><td colspan="9" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/admin.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["admin"]);
+renderDashSidebar("/admin/users.html", [
+  ["/admin/dashboard.html", "Dashboard"],
+  ["/admin/users.html", "User Management"],
+  ["/admin/donors.html", "Donor Management"],
+  ["/admin/hospitals.html", "Hospital Verification"],
+  ["/admin/requests.html", "Blood Requests"],
+  ["/admin/reports.html", "Reports"],
+  ["/admin/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const rows = document.getElementById("rows");
+
+async function load() {
+  try {
+    const users = await AdminService.listUsers();
+    rows.innerHTML = users.map(u => `
+      <tr>
+        <td>${u.id}</td><td>${escapeHtml(u.full_name)}</td><td>${escapeHtml(u.email)}</td>
+        <td>${escapeHtml(u.phone)}</td>
+        <td><span class="badge badge-info">${u.role}</span></td>
+        <td>${u.is_phone_verified ? "✅" : "—"}</td>
+        <td>${u.is_active ? "✅" : "❌"}</td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td>${u.role === "admin" ? "" : `<button class="btn btn-ghost btn-sm" data-id="${u.id}" data-active="${u.is_active}">${u.is_active ? "Deactivate" : "Reactivate"}</button>`}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="9" class="muted">No users.</td></tr>`;
+    rows.querySelectorAll("button[data-id]").forEach(b => b.addEventListener("click", async () => {
+      try { await AdminService.setUserActive(b.dataset.id, b.dataset.active !== "true"); load(); }
+      catch (e) { showAlert(alertBox, e.message); }
+    }));
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+load();
+</script>
+</body>
+</html>

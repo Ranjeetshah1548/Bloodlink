@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Availability — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Availability</h1>
+    <p>Toggle this off any time you're temporarily unable to donate. Unavailable donors are
+      automatically excluded from matching.</p>
+    <div id="alert-box"></div>
+
+    <div class="card" style="max-width:420px;">
+      <div class="flex-between">
+        <div>
+          <strong id="status-label">Loading…</strong>
+          <p class="mb-0 muted" style="font-size:0.85rem;">Current matching status</p>
+        </div>
+        <label class="switch" style="position:relative; display:inline-block; width:52px; height:28px;">
+          <input type="checkbox" id="avail-toggle" style="opacity:0; width:0; height:0;">
+          <span id="switch-track" style="position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:999px; transition:0.2s;"></span>
+        </label>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/donor.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["donor"]);
+renderDashSidebar("/donor/availability.html", [
+  ["/donor/dashboard.html", "Dashboard"],
+  ["/donor/profile.html", "Profile"],
+  ["/donor/availability.html", "Availability"],
+  ["/donor/requests.html", "Incoming Requests"],
+  ["/donor/history.html", "Donation History"],
+  ["/donor/report.html", "Report a Problem"],
+  ["/donor/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const toggle = document.getElementById("avail-toggle");
+const track = document.getElementById("switch-track");
+const label = document.getElementById("status-label");
+
+function paint(available) {
+  track.style.background = available ? "var(--success)" : "#ccc";
+  label.textContent = available ? "Available for matching" : "Unavailable";
+}
+
+async function load() {
+  try {
+    const donor = await DonorService.getAvailability();
+    toggle.checked = donor.is_available;
+    paint(donor.is_available);
+  } catch (e) {
+    if (e.status === 404) {
+      label.textContent = "Create a donor profile first.";
+    } else {
+      showAlert(alertBox, e.message);
+    }
+  }
+}
+load();
+
+toggle.addEventListener("change", async () => {
+  clearAlert(alertBox);
+  try {
+    const donor = await DonorService.setAvailability(toggle.checked);
+    paint(donor.is_available);
+  } catch (e) {
+    showAlert(alertBox, e.message);
+    toggle.checked = !toggle.checked;
+  }
+});
+</script>
+</body>
+</html>

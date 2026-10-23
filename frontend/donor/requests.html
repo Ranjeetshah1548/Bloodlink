@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incoming Requests — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Incoming requests</h1>
+    <p>Requests where BloodLink's matching engine has ranked you as an eligible donor.</p>
+    <div id="alert-box"></div>
+    <div id="list" class="mt-16"></div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/donor.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/matching.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["donor"]);
+renderDashSidebar("/donor/requests.html", [
+  ["/donor/dashboard.html", "Dashboard"],
+  ["/donor/profile.html", "Profile"],
+  ["/donor/availability.html", "Availability"],
+  ["/donor/requests.html", "Incoming Requests"],
+  ["/donor/history.html", "Donation History"],
+  ["/donor/report.html", "Report a Problem"],
+  ["/donor/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+const listEl = document.getElementById("list");
+let donorId = null;
+
+function contactBlock(v) {
+  if (!v.contact_visible) {
+    return `<div class="muted mt-8" style="font-size:0.85rem;">🔒 Patient and contact details are shared with you once you accept.</div>`;
+  }
+  return `
+    <div class="alert alert-success mt-16 mb-0" style="line-height:1.7;">
+      <strong>Contact details (shared because you accepted)</strong><br>
+      🧑‍⚕️ Patient: <strong>${escapeHtml(v.patient_name || "—")}</strong>${v.ward_info ? ` &nbsp;·&nbsp; ${escapeHtml(v.ward_info)}` : ""}<br>
+      📞 Contact: ${escapeHtml(v.contact_name || "—")} —
+      <a href="tel:${escapeHtml(v.contact_phone || "")}"><strong>${escapeHtml(v.contact_phone || "—")}</strong></a><br>
+      🏥 ${escapeHtml(v.hospital_name)}${v.hospital_contact ? ` — <a href="tel:${escapeHtml(v.hospital_contact)}">${escapeHtml(v.hospital_contact)}</a>` : ""}
+      ${v.notes ? `<br>📝 ${escapeHtml(v.notes)}` : ""}
+    </div>`;
+}
+
+function row(v, resp) {
+  const actions = v.my_response === "pending" && !["fulfilled", "closed", "expired"].includes(v.status)
+    ? `<button class="btn btn-accent btn-sm" data-action="accepted" data-req="${v.id}" data-donor="${donorId}">Accept</button>
+       <button class="btn btn-ghost btn-sm" data-action="declined" data-req="${v.id}" data-donor="${donorId}">Decline</button>`
+    : `<span class="badge ${v.my_response === "accepted" ? "badge-verified" : "badge-neutral"}">${v.my_response === "pending" ? v.status : v.my_response}</span>`;
+  return `
+    <div class="card mt-16">
+      <div class="flex-between" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <strong>Request #${v.id} · ${v.blood_group} · ${v.units_required} unit(s)</strong>
+          <div class="muted" style="font-size:0.85rem;">
+            <span class="badge ${urgencyBadgeClass(v.urgency)}">${v.urgency}</span>
+            &nbsp;·&nbsp; 🏥 ${escapeHtml(v.hospital_name)} — ${escapeHtml(v.hospital_address)}
+            ${resp && resp.distance_km != null ? `&nbsp;·&nbsp; ${resp.distance_km} km away` : ""}
+            ${resp && resp.match_score != null ? `&nbsp;·&nbsp; response likelihood ${Math.round(resp.match_score * 100)}%` : ""}
+          </div>
+        </div>
+        <div class="flex gap-8">${actions}</div>
+      </div>
+      ${contactBlock(v)}
+    </div>`;
+}
+
+async function load() {
+  clearAlert(alertBox);
+  listEl.innerHTML = `<div class="skeleton" style="height:80px;"></div>`;
+  try {
+    const donor = await DonorService.getMe();
+    donorId = donor.id;
+    const [responses, requests] = await Promise.all([
+      DonorResponseService.my(),
+      BloodRequestService.list(),
+    ]);
+    const respByReq = Object.fromEntries(responses.map(r => [r.request_id, r]));
+    listEl.innerHTML = requests.length
+      ? requests.map(v => row(v, respByReq[v.id])).join("")
+      : `<div class="empty-state">No requests matched to you yet. Make sure your availability is on.</div>`;
+
+    listEl.querySelectorAll("button[data-action]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        clearAlert(alertBox);
+        btn.disabled = true;
+        try {
+          await DonorResponseService.answer({
+            request_id: Number(btn.dataset.req),
+            donor_id: Number(btn.dataset.donor),
+            response: btn.dataset.action,
+          });
+          load();
+        } catch (e) {
+          showAlert(alertBox, e.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  } catch (e) {
+    if (e.status === 404) {
+      listEl.innerHTML = `<div class="empty-state">Create a donor profile first.</div>`;
+    } else {
+      showAlert(alertBox, e.message);
+      listEl.innerHTML = "";
+    }
+  }
+}
+load();
+</script>
+</body>
+</html>

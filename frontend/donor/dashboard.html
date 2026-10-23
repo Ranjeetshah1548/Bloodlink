@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donor Dashboard — BloodLink</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site-header"><div id="site-header"></div></header>
+
+<div class="dash-shell">
+  <nav class="dash-sidebar" id="dash-sidebar"></nav>
+  <main class="dash-main">
+    <h1>Donor dashboard</h1>
+    <div id="alert-box"></div>
+    <div id="no-profile-cta" style="display:none;" class="card">
+      <h3>Set up your donor profile</h3>
+      <p>Add your blood group, city and coordinates so BloodLink can match you to nearby requests.</p>
+      <a href="/donor/profile.html" class="btn btn-accent">Create donor profile</a>
+    </div>
+
+    <div id="stats-wrap" style="display:none;">
+      <div class="grid grid-4">
+        <div class="card stat-card"><div class="num" id="stat-donations">—</div><div class="label">Total donations</div></div>
+        <div class="card stat-card"><div class="num" id="stat-requests">—</div><div class="label">Requests received</div></div>
+        <div class="card stat-card"><div class="num" id="stat-rate">—</div><div class="label">Response rate</div></div>
+        <div class="card stat-card"><div class="num" id="stat-available">—</div><div class="label">Availability</div></div>
+      </div>
+
+      <div class="card mt-24">
+        <div class="flex-between">
+          <h3 class="mb-0">Pending requests needing your response</h3>
+          <a href="/donor/requests.html" class="btn btn-outline btn-sm">View all</a>
+        </div>
+        <div id="pending-list" class="mt-16"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/config.js"></script>
+<script src="/js/services/apiClient.js"></script>
+<script src="/js/services/auth.js"></script>
+<script src="/js/services/donor.js"></script>
+<script src="/js/services/bloodRequest.js"></script>
+<script src="/js/services/matching.js"></script>
+<script src="/js/app.js"></script>
+<script>
+const session = AuthService.requireRole(["donor"]);
+renderDashSidebar("/donor/dashboard.html", [
+  ["/donor/dashboard.html", "Dashboard"],
+  ["/donor/profile.html", "Profile"],
+  ["/donor/availability.html", "Availability"],
+  ["/donor/requests.html", "Incoming Requests"],
+  ["/donor/history.html", "Donation History"],
+  ["/donor/report.html", "Report a Problem"],
+  ["/donor/notifications.html", "Notifications"],
+]);
+
+const alertBox = document.getElementById("alert-box");
+
+async function load() {
+  try {
+    const [donor, myResponses] = await Promise.all([
+      DonorService.getMe().catch((e) => (e.status === 404 ? null : Promise.reject(e))),
+      DonorResponseService.my(),
+    ]);
+
+    if (!donor) {
+      document.getElementById("no-profile-cta").style.display = "block";
+      return;
+    }
+    document.getElementById("stats-wrap").style.display = "block";
+    document.getElementById("stat-donations").textContent = donor.total_donations;
+    document.getElementById("stat-requests").textContent = donor.previous_requests;
+    document.getElementById("stat-rate").textContent = Math.round(donor.historical_response_rate * 100) + "%";
+    document.getElementById("stat-available").textContent = donor.is_available ? "Available" : "Unavailable";
+
+    const pending = myResponses.filter(r => r.response === "pending");
+    const list = document.getElementById("pending-list");
+    list.innerHTML = pending.length
+      ? pending.map(r => `
+          <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--border);">
+            <div>Request #${r.request_id} — matched ${fmtDateTime(r.notified_at)}
+              ${r.distance_km != null ? `<span class="muted">(${r.distance_km} km away)</span>` : ""}</div>
+            <a href="/donor/requests.html" class="btn btn-sm btn-accent">Respond</a>
+          </div>
+        `).join("")
+      : `<div class="empty-state">No pending requests right now.</div>`;
+  } catch (e) {
+    showAlert(alertBox, e.message);
+  }
+}
+load();
+</script>
+</body>
+</html>
